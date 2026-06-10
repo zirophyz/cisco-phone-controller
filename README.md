@@ -38,6 +38,38 @@ Opens `http://127.0.0.1:8000` automatically.
 
 Download the latest `.exe` from [Releases](https://github.com/rn-bord/cisco-phone-controller/releases) — no Python install needed. Just double-click and go.
 
+## CUCM Setup
+
+This app requires a CUCM (Cisco Unified Communications Manager) user with permission to control the target phone. Here's how to set that up:
+
+### 1. Create an Application User
+
+1. Log into **CUCM Administration** → **User Management** → **Application User**
+2. Click **Add New**
+3. Enter a **User ID** and **Password** (e.g. `remote` / your chosen password)
+4. Under **Device Information**, add the target phone(s) to the **Controlled Devices** list
+5. Click **Save**
+
+### 2. Verify Phone Web Access
+
+1. Open a browser and navigate to `http://<phone-ip>/Device_Information.html`
+2. You should be prompted for credentials — enter the application user you just created
+3. If you can see the Device Information page, the app will work
+
+### 3. Allow Phone Web Server
+
+If the phone doesn't respond on HTTP at all:
+
+1. In CUCM, go to **Device** → **Phone** and select the phone
+2. Scroll to **Web Access** and ensure it's **Enabled**
+3. Save and reset the phone for the change to take effect
+
+### Troubleshooting
+
+- **401 Unauthorized** — Wrong username/password, or the user doesn't exist
+- **403 Forbidden** — User exists but the phone is not listed under that user's **Controlled Devices** in CUCM
+- **Connection refused / timeout** — Phone web server is disabled, or the phone is unreachable from your machine. Check that **Web Access** is enabled on the phone and that your network allows HTTP to the phone's IP
+
 ## Credit
 
 Based on the original [Cisco Phone Controller](https://github.com/avholloway/cisco-phone-controller) browser extension by Anthony Holloway.
