@@ -14,6 +14,7 @@ a = Analysis(
         ('static', 'static'),
     ],
     hiddenimports=[
+        'app',
         'fastapi',
         'starlette',
         'uvicorn.logging',

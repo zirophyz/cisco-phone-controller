@@ -15,13 +15,17 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import StreamingResponse, JSONResponse
 
 # Determine base path (works both as script and frozen .exe)
+# In PyInstaller onefile mode, bundled files live in sys._MEIPASS (temp extraction dir)
+# The exe itself lives at sys.executable, but static/ etc are in _MEIPASS
 if getattr(sys, 'frozen', False):
-    BASE_DIR = os.path.dirname(sys.executable)
+    _INTERNAL_DIR = sys._MEIPASS          # where PyInstaller extracted bundled files
+    _EXE_DIR = os.path.dirname(sys.executable)  # where the .exe sits (for logs)
 else:
-    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    _INTERNAL_DIR = os.path.dirname(os.path.abspath(__file__))
+    _EXE_DIR = _INTERNAL_DIR
 
-STATIC_DIR = os.path.join(BASE_DIR, "static")
-LOG_FILE = os.path.join(BASE_DIR, "cisco-phone-controller.log")
+STATIC_DIR = os.path.join(_INTERNAL_DIR, "static")
+LOG_FILE = os.path.join(_EXE_DIR, "cisco-phone-controller.log")
 
 # Set up file logging so we can debug issues after the console closes
 logging.basicConfig(
