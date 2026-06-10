@@ -7,6 +7,7 @@ FastAPI backend that proxies requests to Cisco IP phones.
 import os
 import sys
 import logging
+import collections
 import httpx
 from contextlib import asynccontextmanager
 from fastapi import FastAPI, Form, HTTPException, Request
@@ -25,16 +26,38 @@ else:
     _EXE_DIR = _INTERNAL_DIR
 
 STATIC_DIR = os.path.join(_INTERNAL_DIR, "static")
-LOG_FILE = os.path.join(_EXE_DIR, "cisco-phone-controller.log")
 
-# Set up file logging so we can debug issues after the console closes
+# --- In-memory log buffer (no files on disk) ---
+MAX_LOG_LINES = 2000
+
+class RingBufferHandler(logging.Handler):
+    """Logging handler that stores records in a thread-safe ring buffer."""
+    def __init__(self, capacity):
+        super().__init__()
+        self.buffer = collections.deque(maxlen=capacity)
+
+    def emit(self, record):
+        self.buffer.append(self.format(record))
+
+    def get_lines(self, count=None):
+        lines = list(self.buffer)
+        if count:
+            lines = lines[-count:]
+        return lines
+
+    def clear(self):
+        self.buffer.clear()
+
+# Set up logging to the ring buffer + stdout (for development)
+ring_handler = RingBufferHandler(MAX_LOG_LINES)
+ring_handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(logging.Formatter("%(asctime)s | %(levelname)s | %(message)s"))
+
 logging.basicConfig(
     level=logging.DEBUG,
-    format="%(asctime)s | %(levelname)s | %(message)s",
-    handlers=[
-        logging.FileHandler(LOG_FILE, mode="w"),
-        logging.StreamHandler(sys.stdout),
-    ],
+    handlers=[ring_handler, console_handler],
 )
 logger = logging.getLogger("cisco-controller")
 
@@ -43,7 +66,6 @@ sessions = {}
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    sessions.clear()
     logger.info("App started, sessions cleared")
     yield
     sessions.clear()
@@ -87,6 +109,17 @@ HTTPX_KWARGS = dict(
 @app.get("/")
 async def index(request: Request):
     return templates.TemplateResponse(request, "index.html")
+
+@app.get("/api/logs")
+async def get_logs(count: int = 100):
+    """Return recent log entries from the in-memory buffer."""
+    return {"logs": ring_handler.get_lines(count)}
+
+@app.delete("/api/logs")
+async def clear_logs():
+    """Purge the in-memory log buffer."""
+    ring_handler.clear()
+    return {"ok": True}
 
 @app.post("/api/connect")
 async def connect(
@@ -221,9 +254,9 @@ async def execute(
 
 @app.post("/api/disconnect")
 async def disconnect(request: Request):
-    client = request.client.host if request.client else "unknown"
-    sessions.pop(client, None)
-    logger.info(f"Session cleared for {client}")
+    client_host = request.client.host if request.client else "unknown"
+    sessions.pop(client_host, None)
+    logger.info(f"Session cleared for {client_host}")
     return {"ok": True}
 
 # --- CLI ---

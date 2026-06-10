@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
-# Start the Cisco Phone Controller app
+# Start the Cisco Phone Controller app (development mode)
+# This runs with the local browser. For the single-window experience, use main.py.
 set -e
 
 cd "$(dirname "$0")"
 
-# Use uv if available, otherwise python3 -m uvicorn
 if command -v uv &>/dev/null; then
-    uv run uvicorn app:app --host 127.0.0.1 --port 8000 --reload
+    uv run python main.py
 else
-    python3 -m uvicorn app:app --host 127.0.0.1 --port 8000 --reload
+    python3 main.py
 fi
