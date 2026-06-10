@@ -12,7 +12,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Form, HTTPException, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import StreamingResponse, JSONResponse
+from fastapi.responses import StreamingResponse, JSONResponse, Response
 
 # Determine base path (works both as script and frozen .exe)
 # In PyInstaller onefile mode, bundled files live in sys._MEIPASS (temp extraction dir)
@@ -181,7 +181,10 @@ async def screenshot(request: Request):
         if resp.status_code == 401:
             raise HTTPException(status_code=401, detail="Authentication failed.")
         media_type = resp.headers.get("content-type", "image/jpeg")
-        return StreamingResponse(resp.iter_raw(), media_type=media_type)
+        # Return the full body as a Response, not StreamingResponse.
+        # StreamingResponse with resp.iter_raw() fails because httpx
+        # consumes the stream during Basic Auth negotiation (401 → retry).
+        return Response(content=resp.content, media_type=media_type)
     except httpx.ConnectError:
         raise HTTPException(status_code=502, detail="Cannot connect to phone.")
     except httpx.TimeoutException:
