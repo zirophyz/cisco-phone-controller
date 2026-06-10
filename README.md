@@ -1,4 +1,4 @@
-# Cisco Phone Controller — Standalone Web App
+# Cisco Phone Controller — Portable Windows App
 
 A portable desktop replacement for the Firefox/Chrome extension. Runs a local FastAPI server with a clean web UI — no browser extension sandboxing, no Firefox XHR bugs.
 
@@ -10,7 +10,6 @@ A portable desktop replacement for the Firefox/Chrome extension. Runs a local Fa
 - Full keypad (0–9, *, #)
 - Command centre: Messages, Nav, Volume, Mute, Speaker, Headset, etc.
 - Advanced actions: Make Call, Run Macro, Join/Stop Multicast Audio, Display Text, Buzz
-- **No persistent credentials** — everything stays in memory until you disconnect or close the app
 
 ## Architecture
 
