@@ -52,8 +52,8 @@ def start_server():
     uvicorn.run(app.app, host=HOST, port=PORT, log_level="warning")
 
 
-def on_window_shown(window):
-    """Called when pywebview window is shown. Wait for server then load the app."""
+def wait_and_redirect(window):
+    """Wait for FastAPI to be ready, then load the app URL."""
     import urllib.request
     import urllib.error
 
@@ -74,7 +74,7 @@ def main():
     server_thread.start()
 
     # Open pywebview window with splash screen immediately.
-    # Once the window is shown and server is ready, redirect to the app.
+    # The func callback runs once the window is shown.
     window = webview.create_window(
         title="Cisco Phone Controller",
         html=SPLASH_HTML,
@@ -82,7 +82,7 @@ def main():
         height=800,
         min_size=(800, 600),
     )
-    webview.start(shown=on_window_shown)
+    webview.start(func=wait_and_redirect, args=(window,))
 
     # When the window closes, daemon threads die automatically
 
