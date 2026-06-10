@@ -1,6 +1,8 @@
-# Cisco Phone Controller — Portable Windows App
+# Cisco Phone Controller — Standalone Web App
 
-A portable desktop replacement for the Firefox/Chrome extension. Runs a local FastAPI server with a clean web UI — no browser extension sandboxing, no Firefox XHR bugs.
+A portable desktop app for controlling Cisco IP phones, rebuilt as a standalone web application to work around breakage in modern Firefox versions.
+
+The original [Cisco Phone Controller](https://github.com/avholloway/cisco-phone-controller) by Anthony Holloway is a browser extension (Chrome + Firefox) that injects a remote control UI onto Cisco IP phone web pages. It hasn't been updated in years and broke on newer Firefox releases — XHR requests from the content script silently fail, so screenshots load but button presses do nothing. This standalone app sidesteps browser extension sandboxing and CORS issues entirely by running a local FastAPI backend that proxies all requests directly to the phone.
 
 ## Features
 
@@ -10,6 +12,8 @@ A portable desktop replacement for the Firefox/Chrome extension. Runs a local Fa
 - Full keypad (0–9, *, #)
 - Command centre: Messages, Nav, Volume, Mute, Speaker, Headset, etc.
 - Advanced actions: Make Call, Run Macro, Join/Stop Multicast Audio, Display Text, Buzz
+- **No persistent credentials** — everything stays in memory until you disconnect or close the app
+- Automatically bypasses corporate HTTP proxies so direct phone access works on managed networks
 
 ## Architecture
 
@@ -19,42 +23,25 @@ A portable desktop replacement for the Firefox/Chrome extension. Runs a local Fa
 
 The backend handles all Basic Auth and XML proxying so the frontend never touches credentials directly.
 
-## Quick Start (Development)
+## Running from Source (Linux / macOS)
 
 ```bash
-cd cisco-phone-controller-app
+git clone https://github.com/rn-bord/cisco-phone-controller.git
+cd cisco-phone-controller
 pip install -r requirements.txt
 python main.py
 ```
 
 Opens `http://127.0.0.1:8000` automatically.
 
-## Build Portable Windows .exe
+## Windows
 
-### Prerequisites
-- Windows 10/11
-- Python 3.11+ installed
+Download the latest `.exe` from [Releases](https://github.com/rn-bord/cisco-phone-controller/releases) — no Python install needed. Just double-click and go.
 
-### Steps
-```powershell
-cd cisco-phone-controller-app
-python -m venv .venv
-.\.venv\Scripts\Activate.ps1
-pip install -r requirements.txt
-pip install pyinstaller
-pyinstaller CiscoPhoneController.spec
-```
+## Credit
 
-Output: `dist\CiscoPhoneController.exe` — a single file you can copy anywhere and double-click to run.
+Based on the original [Cisco Phone Controller](https://github.com/avholloway/cisco-phone-controller) browser extension by Anthony Holloway.
 
-## Troubleshooting
+---
 
-**Screenshot works but buttons don't?**
-That was the Firefox extension bug. This app doesn't have that problem because the backend makes all authenticated requests directly.
-
-**Phone returns 401?**
-- Verify your CUCM user has the phone listed under **Controlled Devices**
-- Try accessing `http://<phone-ip>/CGI/Screenshot` in a browser first
-
-## License
-MIT — based on the original extension by Anthony Holloway.
+*This project was written by an AI assistant. There may be bugs, security issues, or unexpected behaviour. You should manually review the code before running it on your machine or network.*
