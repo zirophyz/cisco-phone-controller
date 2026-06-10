@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cisco Phone Controller</title>
+<style>
+* { box-sizing: border-box; }
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    margin: 0; padding: 20px;
+    background: #f5f5f5;
+}
+#setup-view, #controller-view {
+    max-width: 1200px;
+    margin: 0 auto;
+}
+#controller-view { display: none; }
+
+/* Setup */
+.setup-box {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 30px;
+    max-width: 400px;
+    margin: 60px auto;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.setup-box h2 {
+    margin-top: 0;
+    color: #333;
+    font-size: 1.4rem;
+}
+.setup-box label {
+    display: block;
+    margin: 16px 0 6px;
+    font-size: 0.9rem;
+    color: #555;
+    font-weight: 600;
+}
+.setup-box input {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+.setup-box button {
+    margin-top: 20px;
+    width: 100%;
+    padding: 12px;
+    font-size: 1rem;
+    font-weight: bold;
+    color: #fff;
+    background: #0078d4;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+.setup-box button:hover { background: #005a9e; }
+.setup-box button:disabled { background: #999; cursor: not-allowed; }
+.setup-box .error {
+    color: #c00;
+    margin-top: 12px;
+    font-size: 0.9rem;
+    display: none;
+}
+
+/* Controller Layout */
+#controller-view .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 16px;
+}
+#controller-view .header h2 { margin: 0; }
+#controller-view .header button {
+    padding: 8px 16px;
+    font-size: 0.9rem;
+    cursor: pointer;
+}
+
+.main-layout {
+    display: flex;
+    gap: 20px;
+}
+.left-col {
+    flex: 0 0 auto;
+}
+.right-col {
+    flex: 1 1 auto;
+}
+
+/* Screen */
+#screen-wrap {
+    border: 1px solid #ccc;
+    background: #000;
+    display: inline-block;
+    position: relative;
+}
+#screen-wrap img {
+    width: 533px;
+    height: 320px;
+    display: block;
+}
+#screen-wrap map area { cursor: pointer; }
+
+/* Keypad */
+.keypad {
+    display: grid;
+    grid-template-columns: repeat(3, 70px);
+    gap: 8px;
+    margin-top: 16px;
+}
+.keypad-btn {
+    width: 70px;
+    height: 61px;
+    background: #EFEFEF;
+    border: 1px solid #ccc;
+    text-align: center;
+    line-height: 61px;
+    font-weight: bold;
+    color: #666;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 3px;
+}
+.keypad-btn:hover { background: #66CDAA; }
+
+/* Command Centre */
+.cmd-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 140px);
+    gap: 8px;
+    margin-top: 16px;
+}
+.cmd-btn {
+    width: 140px;
+    height: 30px;
+    border: 1px solid #ccc;
+    text-align: center;
+    line-height: 30px;
+    font-weight: bold;
+    color: #666;
+    cursor: pointer;
+    user-select: none;
+    border-radius: 3px;
+}
+.cmd-btn:hover { background: #66CDAA; }
+
+/* Action rows */
+.action-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 8px;
+}
+.action-row input {
+    width: 294px;
+    height: 36px;
+    padding: 0 8px;
+    border: 1px solid #ccc;
+    font-size: 0.95rem;
+    font-weight: bold;
+    color: #666;
+}
+.action-row button {
+    height: 36px;
+    padding: 0 14px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.status-bar {
+    margin-top: 10px;
+    font-size: 0.85rem;
+    color: #555;
+}
+.status-bar.error { color: #c00; }
+.status-bar.success { color: #080; }
+</style>
+</head>
+<body>
+
+<!-- SETUP VIEW -->
+<div id="setup-view">
+    <div class="setup-box">
+        <h2>Cisco Phone Controller</h2>
+        <label for="ip">Phone IP Address</label>
+        <input type="text" id="ip" placeholder="e.g., 192.168.1.100" value="">
+        <label for="username">Username</label>
+        <input type="text" id="username" placeholder="CUCM End User / Application User" value="">
+        <label for="password">Password</label>
+        <input type="password" id="password" placeholder="Password" value="">
+        <button id="btn-connect" onclick="doConnect()">Connect</button>
+        <div class="error" id="setup-error"></div>
+    </div>
+</div>
+
+<!-- CONTROLLER VIEW -->
+<div id="controller-view">
+    <div class="header">
+        <h2>Cisco Phone Controller</h2>
+        <button onclick="doDisconnect()">Disconnect</button>
+    </div>
+
+    <div class="main-layout">
+        <div class="left-col">
+            <div id="screen-wrap">
+                <img id="screen-img" src="" alt="Phone Screen" usemap="#screen-map">
+                <map name="screen-map" id="screen-map">
+                    <area shape="rect" coords="0,285,133,320"   title="Soft1"    onclick="sendKey('Soft1')">
+                    <area shape="rect" coords="134,285,267,320" title="Soft2"   onclick="sendKey('Soft2')">
+                    <area shape="rect" coords="268,285,401,320" title="Soft3"   onclick="sendKey('Soft3')">
+                    <area shape="rect" coords="402,285,533,320" title="Soft4"   onclick="sendKey('Soft4')">
+                    <area shape="rect" coords="0,45,266,90"     title="Line1"   onclick="sendKey('Line1')">
+                    <area shape="rect" coords="0,91,266,136"    title="Line2"   onclick="sendKey('Line2')">
+                    <area shape="rect" coords="0,137,266,182"   title="Line3"   onclick="sendKey('Line3')">
+                    <area shape="rect" coords="0,183,266,228"   title="Line4"   onclick="sendKey('Line4')">
+                    <area shape="rect" coords="0,229,266,274"   title="Line5"   onclick="sendKey('Line5')">
+                    <area shape="rect" coords="267,45,533,90"   title="Session1" onclick="sendKey('Session1')">
+                    <area shape="rect" coords="267,91,533,136"  title="Session2" onclick="sendKey('Session2')">
+                    <area shape="rect" coords="267,137,533,182" title="Session3" onclick="sendKey('Session3')">
+                    <area shape="rect" coords="267,183,533,228" title="Session4" onclick="sendKey('Session4')">
+                    <area shape="rect" coords="267,229,533,274" title="Session5" onclick="sendKey('Session5')">
+                </map>
+            </div>
+            <div class="status-bar" id="status">Connected.</div>
+        </div>
+
+        <div class="right-col">
+            <h3>Keypad</h3>
+            <div class="keypad" id="keypad"></div>
+
+            <h3 style="margin-top:20px">Command Centre</h3>
+            <div class="cmd-grid" id="cmd-grid"></div>
+
+            <h3 style="margin-top:20px">Actions</h3>
+            <div class="action-row">
+                <input type="text" id="inp-number" placeholder="E.g., A Dial Pattern">
+                <button onclick="doMakeCall()">Make Call</button>
+            </div>
+            <div class="action-row">
+                <input type="text" id="inp-macro" placeholder="E.g., Settings, Pause, KeyPad5">
+                <button onclick="doMacro()">Run Macro</button>
+            </div>
+            <div class="action-row">
+                <input type="text" id="inp-mcast" placeholder="E.g., 239.1.1.13:20480">
+                <button onclick="doJoinAudio()">Join Audio</button>
+                <button onclick="doStopAudio()">Stop Audio</button>
+            </div>
+            <div class="action-row">
+                <input type="text" id="inp-display" placeholder="E.g., Good morning!">
+                <button onclick="doDisplay()">Display Text</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+// --- State ---
+let screenshotTimer = null;
+
+// --- Setup ---
+function showError(msg) {
+    const el = document.getElementById('setup-error');
+    el.textContent = msg;
+    el.style.display = msg ? 'block' : 'none';
+}
+function setStatus(msg, isError) {
+    const el = document.getElementById('status');
+    el.textContent = msg;
+    el.className = 'status-bar' + (isError ? ' error' : ' success');
+}
+
+async function doConnect() {
+    const btn = document.getElementById('btn-connect');
+    const ip = document.getElementById('ip').value.trim();
+    const username = document.getElementById('username').value.trim();
+    const password = document.getElementById('password').value;
+
+    if (!ip || !username || !password) {
+        showError('Please fill in all fields.');
+        return;
+    }
+    showError('');
+    btn.disabled = true;
+    btn.textContent = 'Connecting...';
+
+    try {
+        const fd = new URLSearchParams();
+        fd.append('ip', ip);
+        fd.append('username', username);
+        fd.append('password', password);
+
+        const r = await fetch('/api/connect', {
+            method: 'POST',
+            body: fd
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+            throw new Error(data.detail || `HTTP ${r.status}`);
+        }
+        // Switch views
+        document.getElementById('setup-view').style.display = 'none';
+        document.getElementById('controller-view').style.display = 'block';
+        startScreenshotLoop();
+    } catch (e) {
+        showError(e.message || 'Connection failed.');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Connect';
+    }
+}
+
+async function doDisconnect() {
+    try { await fetch('/api/disconnect', {method: 'POST'}); } catch(e) {}
+    stopScreenshotLoop();
+    document.getElementById('controller-view').style.display = 'none';
+    document.getElementById('setup-view').style.display = 'block';
+    // Clear fields
+    document.getElementById('ip').value = '';
+    document.getElementById('username').value = '';
+    document.getElementById('password').value = '';
+    showError('');
+}
+
+// --- Screenshot ---
+function refreshScreenshot() {
+    const img = document.getElementById('screen-img');
+    const ts = Date.now();
+    img.src = '/api/screenshot?id=' + ts;
+}
+function startScreenshotLoop() {
+    refreshScreenshot();
+    screenshotTimer = setInterval(refreshScreenshot, 6000);
+}
+function stopScreenshotLoop() {
+    if (screenshotTimer) { clearInterval(screenshotTimer); screenshotTimer = null; }
+}
+
+// --- Keypad generation ---
+const keypadIds = [
+    'KeyPad1','KeyPad2','KeyPad3',
+    'KeyPad4','KeyPad5','KeyPad6',
+    'KeyPad7','KeyPad8','KeyPad9',
+    'KeyPadStar','KeyPad0','KeyPadPound'
+];
+const keypadLabels = [
+    '1','2','3','4','5','6','7','8','9',
+    '*','0','#'
+];
+const keypadContainer = document.getElementById('keypad');
+keypadIds.forEach((id, i) => {
+    const div = document.createElement('div');
+    div.className = 'keypad-btn';
+    div.textContent = keypadLabels[i];
+    if (id === 'KeyPadStar') div.style.fontSize = '1.3rem';
+    div.onclick = () => sendKey(id);
+    keypadContainer.appendChild(div);
+});
+
+// --- Command Centre generation ---
+const cmdButtons = [
+    'Messages','NavUp','Directories','VolUp',
+    'Buzz','NavLeft','NavSelect','NavRight','VolDwn',
+    'Unlock','NavBack','NavDwn','Applications','Settings',
+    'Reset','Speaker','Headset','Mute'
+];
+const cmdGrid = document.getElementById('cmd-grid');
+cmdButtons.forEach(label => {
+    const div = document.createElement('div');
+    div.className = 'cmd-btn';
+    div.textContent = label;
+    if (label === 'Buzz') {
+        div.style.background = '#ffdddd';
+    }
+    div.onclick = () => handleCmd(label);
+    cmdGrid.appendChild(div);
+});
+
+// --- XML Templates ---
+const XML_KEY = '<CiscoIPPhoneExecute><ExecuteItem URL="Key:%KEY%" /></CiscoIPPhoneExecute>';
+const XML_BUZZ = '<CiscoIPPhoneExecute><ExecuteItem URL="Play:CallBack.raw" /></CiscoIPPhoneExecute>';
+const XML_CALL = '<CiscoIPPhoneExecute><ExecuteItem URL="Dial:%NUMBER%" /></CiscoIPPhoneExecute>';
+const XML_MCAST = '<CiscoIPPhoneExecute><ExecuteItem URL="RTPMRx:%ADDRESS%:100" /></CiscoIPPhoneExecute>';
+const XML_MCAST_STOP = '<CiscoIPPhoneExecute><ExecuteItem URL="RTPMRx:Stop" /></CiscoIPPhoneExecute>';
+const XML_DISPLAY = '<CiscoIPPhoneText><Title>Informational Message</Title><Prompt></Prompt><Text>%MSG%</Text></CiscoIPPhoneText>';
+
+// --- Command dispatch ---
+function handleCmd(id) {
+    switch(id) {
+        case 'Buzz': return sendXml(XML_BUZZ, 'Buzzing...');
+        case 'Unlock': return setStatus('Unlock not implemented', true);
+        case 'Reset':  return setStatus('Reset not implemented', true);
+        default: return sendKey(id);
+    }
+}
+
+async function sendKey(key) {
+    const xml = XML_KEY.replace('%KEY%', key);
+    await sendXml(xml, key);
+}
+
+async function sendXml(xml, desc) {
+    try {
+        setStatus('Sending: ' + desc + '...');
+        const fd = new URLSearchParams();
+        fd.append('xml', xml);
+        const r = await fetch('/api/execute', {
+            method: 'POST',
+            body: fd
+        });
+        const data = await r.json().catch(() => ({}));
+        if (!r.ok) {
+            throw new Error(data.detail || `HTTP ${r.status}`);
+        }
+        setStatus('Sent: ' + desc + ' (HTTP ' + data.status + ')');
+        // Refresh screenshot sooner
+        clearTimeout(screenshotTimer);
+        screenshotTimer = setInterval(refreshScreenshot, 6000);
+        setTimeout(refreshScreenshot, 750);
+    } catch (e) {
+        setStatus('Error: ' + (e.message || 'Failed to send command'), true);
+    }
+}
+
+// --- Advanced actions ---
+async function doMakeCall() {
+    const num = document.getElementById('inp-number').value.trim();
+    if (!num) return setStatus('Enter a number first.', true);
+    const xml = XML_CALL.replace('%NUMBER%', num.replace(/\+/g, '%2B'));
+    await sendXml(xml, 'Make Call ' + num);
+}
+
+async function doMacro() {
+    const list = document.getElementById('inp-macro').value.trim();
+    if (!list) return setStatus('Enter a macro first.', true);
+    const keys = list.split(',').map(s => s.trim()).filter(Boolean);
+    setStatus('Running macro (' + keys.length + ' steps)...');
+    for (const key of keys) {
+        if (key.toLowerCase() === 'pause') {
+            await new Promise(r => setTimeout(r, 500));
+        } else {
+            await sendKey(key);
+            await new Promise(r => setTimeout(r, 500));
+        }
+    }
+    setStatus('Macro complete.');
+}
+
+async function doJoinAudio() {
+    const addr = document.getElementById('inp-mcast').value.trim();
+    if (!addr) return setStatus('Enter a multicast address first.', true);
+    const xml = XML_MCAST.replace('%ADDRESS%', addr);
+    await sendXml(xml, 'Join Audio ' + addr);
+}
+
+async function doStopAudio() {
+    await sendXml(XML_MCAST_STOP, 'Stop Audio');
+}
+
+async function doDisplay() {
+    const msg = document.getElementById('inp-display').value.trim();
+    if (!msg) return setStatus('Enter text first.', true);
+    const xml = XML_DISPLAY.replace('%MSG%', msg);
+    await sendXml(xml, 'Display: ' + msg);
+}
+
+// Enter key on setup inputs triggers connect
+['ip','username','password'].forEach(id => {
+    document.getElementById(id).addEventListener('keydown', e => {
+        if (e.key === 'Enter') doConnect();
+    });
+});
+</script>
+</body>
+</html>
