@@ -1,15 +1,20 @@
 """
 Entry point for Cisco Phone Controller.
-Starts a local FastAPI server and opens a pywebview native window.
-Shows a splash screen while the server starts, then loads the app.
-No console window, no external browser — single app experience.
+
+Default mode: pywebview native window with splash screen (single app experience).
+Fallback mode (--browser): opens in system browser instead.
+Headless mode (--headless): runs server only, no window (for remote/SSH usage).
+
+Usage:
+    python main.py              # Native window (default)
+    python main.py --browser    # Open in system browser
+    python main.py --headless   # Server only, no UI
 """
 
 import os
 import sys
 import threading
 import time
-import webview  # pywebview
 
 # Determine the base path (works both as script and frozen .exe)
 if getattr(sys, 'frozen', False):
@@ -52,29 +57,30 @@ def start_server():
     uvicorn.run(app.app, host=HOST, port=PORT, log_level="warning")
 
 
-def wait_and_redirect(window):
-    """Wait for FastAPI to be ready, then load the app URL."""
+def wait_for_server():
+    """Block until the FastAPI server responds, up to 10 seconds."""
     import urllib.request
     import urllib.error
-
-    for _ in range(100):  # up to 10 seconds
+    for _ in range(100):
         try:
             urllib.request.urlopen(f"{URL}/", timeout=0.5)
-            break
+            return True
         except (urllib.error.URLError, ConnectionRefusedError, OSError):
             time.sleep(0.1)
-
-    # Server is ready — load the real app
-    window.load_url(URL)
+    return False
 
 
-def main():
-    # Start FastAPI in a daemon thread
+def run_webview():
+    """Launch pywebview with splash screen, redirect to app when ready."""
+    import webview
+
+    def wait_and_redirect(window):
+        wait_for_server()
+        window.load_url(URL)
+
     server_thread = threading.Thread(target=start_server, daemon=True)
     server_thread.start()
 
-    # Open pywebview window with splash screen immediately.
-    # The func callback runs once the window is shown.
     window = webview.create_window(
         title="Cisco Phone Controller",
         html=SPLASH_HTML,
@@ -84,7 +90,55 @@ def main():
     )
     webview.start(func=wait_and_redirect, args=(window,))
 
-    # When the window closes, daemon threads die automatically
+
+def run_browser():
+    """Start server and open in system browser."""
+    import webbrowser
+
+    server_thread = threading.Thread(target=start_server, daemon=True)
+    server_thread.start()
+
+    if wait_for_server():
+        webbrowser.open(URL)
+        print(f"Opened {URL} in your browser. Press Ctrl+C to stop.")
+    else:
+        print("Server failed to start.", file=sys.stderr)
+        sys.exit(1)
+
+    # Keep main thread alive
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nShutting down.")
+
+
+def run_headless():
+    """Start server only, no UI. Useful for remote/SSH usage."""
+    print(f"Cisco Phone Controller running at {URL}")
+    print("Press Ctrl+C to stop.")
+    start_server()
+
+
+def main():
+    mode = "webview"
+    if "--browser" in sys.argv:
+        mode = "browser"
+    elif "--headless" in sys.argv:
+        mode = "headless"
+
+    if mode == "webview":
+        try:
+            run_webview()
+        except ImportError:
+            print("pywebview not available, falling back to browser mode.", file=sys.stderr)
+            print("Install pywebview for the single-window experience: pip install pywebview", file=sys.stderr)
+            mode = "browser"
+
+    if mode == "browser":
+        run_browser()
+    elif mode == "headless":
+        run_headless()
 
 
 if __name__ == "__main__":

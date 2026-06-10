@@ -6,24 +6,31 @@ The original [Cisco Phone Controller](https://github.com/avholloway/cisco-phone-
 
 ## Features
 
+- **Single-window desktop app** — launches as a native window, no browser needed
+- Splash screen while the server starts up
 - Landing page: enter phone IP, username, and password
 - Live screenshot viewer (auto-refreshes every 6 seconds)
 - Clickable phone screen (softkeys, lines, sessions)
-- Full keypad (0–9, *, #)
-- Command centre: Messages, Nav, Volume, Mute, Speaker, Headset, etc.
-- Advanced actions: Make Call, Run Macro, Join/Stop Multicast Audio, Display Text, Buzz
+- Full keypad (0–9, *, #) and D-pad navigation (⇧⇩⇦⇨ Select Back Vol)
+- Function keys: Messages, Directories, Applications, Settings, Speaker, Headset, Mute
+- Advanced actions: Make Call, Run Macro, Join/Stop Multicast Audio, Display Text
+- In-app log viewer (View Logs in menu bar) — logs are in-memory only, purged on exit
 - **No persistent credentials** — everything stays in memory until you disconnect or close the app
 - Automatically bypasses corporate HTTP proxies so direct phone access works on managed networks
 
 ## Architecture
 
 ```
-[Browser] <--local HTTP--> [FastAPI Backend] <--HTTP Auth--> [Cisco IP Phone]
+[pywebview Window] <--local HTTP--> [FastAPI Backend] <--HTTP Auth--> [Cisco IP Phone]
 ```
 
 The backend handles all Basic Auth and XML proxying so the frontend never touches credentials directly.
 
-## Running from Source (Linux / macOS)
+## Running from Source
+
+### Windows / macOS / Linux (with desktop)
+
+Requires [pywebview](https://pywebview.flowrl.com/) for the single-window experience. On Linux you also need `python3-webkit2` or equivalent GTK webkit bindings.
 
 ```bash
 git clone https://github.com/rn-bord/cisco-phone-controller.git
@@ -32,9 +39,31 @@ pip install -r requirements.txt
 python main.py
 ```
 
-Opens `http://127.0.0.1:8000` automatically.
+This opens a native window with the app. If `pywebview` is not installed, it falls back to your system browser.
 
-## Windows
+### Browser mode
+
+Opens the app in your default browser instead of a native window:
+
+```bash
+python main.py --browser
+```
+
+### Headless / remote (SSH, servers)
+
+Runs the server only — no window, no browser. Access from another machine at `http://<your-ip>:8000`:
+
+```bash
+python main.py --headless
+```
+
+You can also set `HOST=0.0.0.0` to listen on all interfaces:
+
+```bash
+HOST=0.0.0.0 python main.py --headless
+```
+
+## Windows EXE
 
 Download the latest `.exe` from [Releases](https://github.com/rn-bord/cisco-phone-controller/releases) — no Python install needed. Just double-click and go.
 
@@ -61,7 +90,7 @@ This app requires a CUCM (Cisco Unified Communications Manager) user with permis
 If the phone doesn't respond on HTTP at all:
 
 1. In CUCM, go to **Device** → **Phone** and select the phone
-2. Scroll to **Web Access** and ensure it's **Enabled**
+2. Scroll to **Web Access** and ensure it is **Enabled**
 3. Save and reset the phone for the change to take effect
 
 ### Troubleshooting
