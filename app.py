@@ -72,6 +72,16 @@ PHONE_HEADERS = {
     "Connection": "keep-alive",
 }
 
+# httpx client kwargs — bypass corporate proxies since we talk directly to phones
+# on the local network. trust_env=False prevents httpx from reading HTTP_PROXY
+# / HTTPS_PROXY / NO_PROXY env vars.
+HTTPX_KWARGS = dict(
+    follow_redirects=True,
+    trust_env=False,      # skip system proxy settings
+    timeout=10.0,
+    headers=PHONE_HEADERS,
+)
+
 # --- Routes ---
 
 @app.get("/")
@@ -90,14 +100,9 @@ async def connect(
 
     url = f"http://{ip}/CGI/Screenshot"
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
+        async with httpx.AsyncClient(**HTTPX_KWARGS) as client:
             logger.debug(f"GET {url}")
-            resp = await client.get(
-                url,
-                auth=(username, password),
-                headers=PHONE_HEADERS,
-                timeout=10.0,
-            )
+            resp = await client.get(url, auth=(username, password))
             logger.debug(f"Response status: {resp.status_code}")
             logger.debug(f"Response headers: {dict(resp.headers)}")
             # Log a snippet of the body for diagnostics
@@ -109,6 +114,24 @@ async def connect(
             raise HTTPException(status_code=401, detail="Authentication failed. Check username/password.")
         if resp.status_code == 403:
             logger.warning("Phone returned 403 Forbidden")
+            # Check if this came through a proxy (corporate web filter)
+            via_header = resp.headers.get("via", "")
+            resp_body = resp.text[:300] if resp.text else ""
+            if "proxy" in via_header.lower() or "access denied" in resp_body.lower():
+                logger.warning("403 appears to come from a corporate proxy, not the phone")
+                raise HTTPException(
+                    status_code=403,
+                    detail=(
+                        "Request blocked by a corporate proxy/web filter.\n\n"
+                        f"Proxy detected: {via_header}\n\n"
+                        "Your computer has an HTTP_PROXY environment variable set, "
+                        "which is routing phone requests through a proxy server that "
+                        "blocks access to internal IPs.\n\n"
+                        "This app has been updated to bypass system proxies — "
+                        "please download the latest version. If the problem persists, "
+                        "try setting NO_PROXY=* or unsetting HTTP_PROXY in your environment."
+                    ),
+                )
             # 403 on Cisco phones usually means the user is valid but not authorized
             # to control this phone (missing Controlled Devices association in CUCM)
             raise HTTPException(
@@ -153,13 +176,8 @@ async def screenshot(request: Request):
 
     url = f"http://{session['ip']}/CGI/Screenshot"
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
-            resp = await client.get(
-                url,
-                auth=(session["username"], session["password"]),
-                headers=PHONE_HEADERS,
-                timeout=10.0,
-            )
+        async with httpx.AsyncClient(**HTTPX_KWARGS) as client:
+            resp = await client.get(url, auth=(session["username"], session["password"]))
         if resp.status_code == 401:
             raise HTTPException(status_code=401, detail="Authentication failed.")
         media_type = resp.headers.get("content-type", "image/jpeg")
@@ -181,16 +199,12 @@ async def execute(
     url = f"http://{session['ip']}/CGI/Execute"
     logger.debug(f"Execute POST to {url} with XML: {xml[:200]}...")
     try:
-        async with httpx.AsyncClient(follow_redirects=True) as client:
+        async with httpx.AsyncClient(**HTTPX_KWARGS) as client:
             resp = await client.post(
                 url,
                 auth=(session["username"], session["password"]),
                 data={"XML": xml},
-                timeout=10.0,
-                headers={
-                    **PHONE_HEADERS,
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
+                headers={**PHONE_HEADERS, "Content-Type": "application/x-www-form-urlencoded"},
             )
         logger.debug(f"Execute response: {resp.status_code}")
         return JSONResponse(content={
