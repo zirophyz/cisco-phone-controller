@@ -10,6 +10,9 @@ import threading
 import time
 import uvicorn
 
+# Import app so PyInstaller analyses it and bundles FastAPI + deps
+import app
+
 # Determine the base path (works both as script and frozen .exe)
 if getattr(sys, 'frozen', False):
     BASE_DIR = os.path.dirname(sys.executable)
@@ -30,7 +33,15 @@ def main():
     print(f"Starting Cisco Phone Controller...")
     print(f"URL: {URL}")
     threading.Thread(target=open_browser, daemon=True).start()
-    uvicorn.run("app:app", host=HOST, port=PORT, log_level="info")
+    # Pass app object directly so PyInstaller doesn't need to resolve the string at runtime
+    uvicorn.run(app.app, host=HOST, port=PORT, log_level="info")
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as e:
+        import traceback
+        print("\n*** FATAL ERROR ***")
+        traceback.print_exc()
+        input("\nPress Enter to exit...")
+        raise

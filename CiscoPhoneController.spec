@@ -12,9 +12,10 @@ a = Analysis(
     binaries=[],
     datas=[
         ('static', 'static'),
-        ('app.py', '.'),
     ],
     hiddenimports=[
+        'fastapi',
+        'starlette',
         'uvicorn.logging',
         'uvicorn.loops',
         'uvicorn.loops.auto',
